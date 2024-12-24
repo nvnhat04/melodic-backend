@@ -215,36 +215,6 @@ const MusicModel = {
   getNewReleases: async (callback) => {
     try {
       const query = `
-      WITH track_info AS (
-    SELECT 
-        t.id, 
-        t.title, 
-        t.release_date, 
-        t.track_url,
-        t.duration,
-        a.cover AS cover
-    FROM tracks t
-    LEFT JOIN track_album ta ON t.id = ta.track_id
-    LEFT JOIN albums a ON ta.album_id = a.id
-),
-genres AS (
-    SELECT 
-        tg.track_id,
-        tg.genre_id
-    FROM track_genre tg
-),
-artists AS (
-    SELECT 
-        ut.track_id,
-        JSON_OBJECT(
-            'id', u.id, 
-            'display_name', u.display_name, 
-            'username', u.username
-        ) AS artist_info
-    FROM user_track ut
-    INNER JOIN users u ON ut.user_id = u.id
-    GROUP BY ut.track_id, u.id, u.display_name, u.username  -- Đảm bảo mỗi artist chỉ xuất hiện 1 lần
-)
 SELECT 
     t.id,
     t.title,
@@ -252,23 +222,49 @@ SELECT
     t.duration,
     t.track_url,
     t.cover,
+    t.status,
     COALESCE(GROUP_CONCAT(DISTINCT g.genre_id), '') AS genres,
     COALESCE(
         GROUP_CONCAT(DISTINCT a.artist_info),
         ''
     ) AS artists
 FROM 
-    track_info t
-LEFT JOIN genres g ON t.id = g.track_id
-LEFT JOIN artists a ON t.id = a.track_id
+    (SELECT 
+        t.id, 
+        t.title, 
+        t.release_date, 
+        t.track_url,
+        t.duration,
+        t.status,
+        a.cover AS cover
+     FROM tracks t
+     LEFT JOIN track_album ta ON t.id = ta.track_id
+     LEFT JOIN albums a ON ta.album_id = a.id) t
+LEFT JOIN 
+    (SELECT 
+        tg.track_id,
+        tg.genre_id
+     FROM track_genre tg) g ON t.id = g.track_id
+LEFT JOIN 
+    (SELECT 
+        ut.track_id,
+        JSON_OBJECT(
+            'id', u.id, 
+            'display_name', u.display_name, 
+            'username', u.username
+        ) AS artist_info
+     FROM user_track ut
+     INNER JOIN users u ON ut.user_id = u.id
+     GROUP BY ut.track_id, u.id, u.display_name, u.username) a ON t.id = a.track_id
 WHERE 
-    t.track_url IS NOT NULL
+    t.track_url IS NOT NULL AND t.status = 'public'
 GROUP BY 
     t.id, t.title, t.release_date, t.track_url, t.cover, t.duration
 ORDER BY 
     t.release_date DESC
 LIMIT 8;
-            `;
+
+      `;
       const [result] = await pool.query(query);
       return callback(null, result);
     } catch (error) {
@@ -311,23 +307,23 @@ LIMIT 8;
   getTopArtists: async (callback) => {
     try {
       const query = `
-            WITH artist_plays AS (
             SELECT 
-                ut.user_id AS artist_id, 
-                COUNT(put.track_id) AS total_plays
-            FROM user_track ut
-            INNER JOIN plays_user_track put ON ut.track_id = put.track_id
-            GROUP BY ut.user_id
-            )
-            SELECT 
-            u.id AS artist_id,
-            u.display_name AS artist_name,
-            ap.total_plays,
-            u.avatar as avatar
-            FROM users u
-            INNER JOIN artist_plays ap ON u.id = ap.artist_id
-            ORDER BY ap.total_plays DESC
-            LIMIT 10;
+    u.id AS artist_id,
+    u.display_name AS artist_name,
+    artist_plays.total_plays,
+    u.avatar AS avatar
+FROM users u
+INNER JOIN (
+    SELECT 
+        ut.user_id AS artist_id, 
+        COUNT(put.track_id) AS total_plays
+    FROM user_track ut
+    INNER JOIN plays_user_track put ON ut.track_id = put.track_id
+    GROUP BY ut.user_id
+) artist_plays ON u.id = artist_plays.artist_id
+ORDER BY artist_plays.total_plays DESC
+LIMIT 10;
+
             `;
       const [result] = await pool.query(query);
       return callback(null, result);

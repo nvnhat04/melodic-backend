@@ -1,5 +1,6 @@
 import ArtistModel from "../model/artist.model.js";
 import useGoogleDriveUpload from "../hooks/upload.media.js";
+import createUrl from "../hooks/createUrl.js";
 class ArtistController {
   async getTopTracks(req, res) {
     const { id: artist_id } = req.params;
@@ -74,6 +75,7 @@ class ArtistController {
     const album = req.body;
     console.log("Album:", album);
     const cover = await useGoogleDriveUpload(req, res);
+    // const url = createUrl(cover);
     // const cover = '1uPpcuN038RVhwU-IHLHSsCxG61lpCHay';
     ArtistModel.addAlbum(album, cover, (error, result) => {
       if (error) {

@@ -7,6 +7,7 @@ const LibraryModel = {
             SELECT 
                 t.id AS id,
                 t.title AS title,
+                
                 MAX(put.played_at) AS latest_played_at
             FROM 
                 plays_user_track AS put

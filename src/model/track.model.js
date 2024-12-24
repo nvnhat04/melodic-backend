@@ -61,7 +61,8 @@ const TrackModel = {
         track_url: result.track.track_url,
         genres: result.genre.length > 0 ? result.genre : null, // If genres exist, include them, else null
         artists: result.artists.length > 0 ? result.artists : null,
-        album: result.album.length > 0 ? result.album : null // If artists exist, include them, else null
+        album: result.album.length > 0 ? result.album : null, // If artists exist, include them, else null
+        cover: result.album.length > 0 ? result.album[0].cover : null
       };
       return callback(null, trackInfo);
     } catch (error) {
@@ -274,13 +275,14 @@ const TrackModel = {
       }
 
       if (mainArtistProfit === 100) {
-        const mainArtistQuery = `INSERT INTO user_track (user_id, track_id, artist_role, profit_share, status) VALUES (?, ?, ?, ?, ?)`;
+        const mainArtistQuery = `INSERT INTO user_track (user_id, track_id, artist_role, profit_share, status, created_at) VALUES (?, ?, ?, ?, ?)`;
         await pool.query(mainArtistQuery, [
           user_id,
           trackResult[0].id,
           "original artist",
           mainArtistProfit,
           "approved",
+          formattedReleaseDate,
         ]);
         return callback(null, {
           status: 200,
@@ -288,12 +290,14 @@ const TrackModel = {
           track: trackResult[0],
         });
       }
-      const mainArtistQuery = `INSERT INTO user_track (user_id, track_id, artist_role, profit_share) VALUES (?, ?, ?, ?)`;
+      const mainArtistQuery = `INSERT INTO user_track (user_id, track_id, artist_role, profit_share, status, created_at) VALUES (?, ?, ?, ?)`;
       await pool.query(mainArtistQuery, [
         user_id,
         trackResult[0].id,
         "original artist",
         mainArtistProfit,
+        "pending",
+        formattedReleaseDate,
       ]);
       return callback(null, {
         status: 200,
