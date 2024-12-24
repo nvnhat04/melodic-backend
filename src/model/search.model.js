@@ -109,60 +109,59 @@ LIMIT 12;
     browseByGenre: async (genre_id, limit, offset) => {
         try {
         const query = `
-   WITH track_info AS (
-    SELECT 
-        t.id, 
-        t.title, 
-        t.duration, 
-        t.release_date,
-        t.track_url,
-        a.cover AS cover
-    FROM tracks t
-    LEFT JOIN track_album ta ON t.id = ta.track_id
-    LEFT JOIN albums a ON ta.album_id = a.id
-),
-genres AS (
-    SELECT 
-        tg.track_id,
-        tg.genre_id
-    FROM track_genre tg
-),
-artists AS (
-    SELECT 
-        ut.track_id,
-        u.display_name,
-        u.id AS artist_id,
-        u.username
-    FROM user_track ut
-    INNER JOIN users u ON ut.user_id = u.id
-)
-SELECT 
-    t.id,
-    t.title,
-    t.duration,
-    t.cover,
-    t.release_date,
-    t.track_url,
-    COALESCE(GROUP_CONCAT(DISTINCT g.genre_id), '') AS genres,
+   SELECT 
+    track_info.id,
+    track_info.title,
+    track_info.duration,
+    track_info.cover,
+    track_info.release_date,
+    track_info.track_url,
+    COALESCE(GROUP_CONCAT(DISTINCT genres.genre_id), '') AS genres,
     COALESCE(
         GROUP_CONCAT(
             DISTINCT CONCAT(
-                '{"id":"', a.artist_id, '", "display_name":"', a.display_name, '", "username":"', a.username, '"}'
-            ) 
+                '{"id":"', artists.artist_id, '", "display_name":"', artists.display_name, '", "username":"', artists.username, '"}'
+            )
         ), 
         ''  -- Empty string in case of no artists
     ) AS artists
 FROM 
-    track_info t
-LEFT JOIN genres g ON t.id = g.track_id
-LEFT JOIN artists a ON t.id = a.track_id
+    (
+        SELECT 
+            t.id, 
+            t.title, 
+            t.duration, 
+            t.release_date,
+            t.track_url,
+            a.cover AS cover
+        FROM tracks t
+        LEFT JOIN track_album ta ON t.id = ta.track_id
+        LEFT JOIN albums a ON ta.album_id = a.id
+    ) AS track_info
+LEFT JOIN 
+    (
+        SELECT 
+            tg.track_id,
+            tg.genre_id
+        FROM track_genre tg
+    ) AS genres ON track_info.id = genres.track_id
+LEFT JOIN 
+    (
+        SELECT 
+            ut.track_id,
+            u.display_name,
+            u.id AS artist_id,
+            u.username
+        FROM user_track ut
+        INNER JOIN users u ON ut.user_id = u.id
+    ) AS artists ON track_info.id = artists.track_id
 WHERE
-    t.track_url IS NOT NULL 
-    AND g.genre_id = ?  -- Filter by genre_id
+    track_info.track_url IS NOT NULL 
+    AND genres.genre_id = ?  -- Filter by genre_id
 GROUP BY 
-    t.id, t.title, t.release_date, t.duration, t.cover, t.track_url
+    track_info.id, track_info.title, track_info.release_date, track_info.duration, track_info.cover, track_info.track_url
 ORDER BY 
-    t.release_date DESC
+    track_info.release_date DESC
 LIMIT ? OFFSET ?;  -- Apply pagination
 
 
